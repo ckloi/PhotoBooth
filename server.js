@@ -1,9 +1,13 @@
-portNum = 8078;
+
+portNum = 8066;
+
 /* use the express framwork */
 var express = require("express");
 
 //for parsing forms and reading in the images
 var formidable = require('formidable');
+
+var googleCV = require('./public/googleCV.js');
 
 //making database
 var sqlite3 = require("sqlite3").verbose(); // use sqlite
@@ -46,9 +50,28 @@ app.post('/', function(request, response) {
 
   // callback for when file is fully recieved
   form.on('end', function() {
-    insertToDB(fileName);
-    response.status(201);
-    response.send("recieved file"); // respond to browser
+    var db = new sqlite3.Database(dbFile);
+    //1 for favorite and 0 for not favorite.
+    var sqlQuery = [fileName, " ", "0"];
+    console.log(sqlQuery);
+    db.serialize(function() {
+      db.run("INSERT INTO Photobooth VALUES  (? ,?, ?) ", sqlQuery, insertCallback);
+    })
+    db.close();
+
+    function insertCallback(err){
+      if (err) {
+        response.status(500);
+        response.send("Error");
+        console.log("error :", err, "\n");
+      }else{
+        googleCV.annotateImage(fileName, function(labels) {
+          response.status(201);
+          response.send(labels);
+        });
+      }
+    }
+     // respond to browser
   });
 
 });
@@ -68,22 +91,7 @@ app.get('/fetchPictures', function(req, res) {
   }
 });
 
-
-
-function insertToDB(fileName) {
-  var db = new sqlite3.Database(dbFile);
-  //1 for favorite and 0 for not favorite.
-  var sqlQuery = [fileName, " ", "0"];
-  console.log(sqlQuery);
-  db.serialize(function() {
-    db.run("INSERT INTO Photobooth VALUES  (? ,?, ?) ", sqlQuery, errorCallback);
-  })
-  db.close();
-
-}
-
 function errorCallback(err) {
-
   if (err) {
     console.log("error :", err, "\n");
   }
@@ -95,10 +103,12 @@ var querystring = require('querystring'); // handy for parsing query strings
 
 function answer(query, response) {
   // query looks like: op=add&img=[image filename]&label=[label to add]
+  //query looks like: op=remove&img=[image filename]&label=[label to delete]
   queryObj = querystring.parse(query);
   var label = queryObj.label;
   var imageFile = queryObj.img;
-  if (label && imageFile) {
+  console.log(imageFile);
+  if (imageFile) {
     db.get('SELECT labels FROM Photobooth WHERE fileName = ?', [imageFile], getCallback);
   }
 
@@ -106,16 +116,29 @@ function answer(query, response) {
     console.log("getting labels from " + imageFile);
     if (err) {
       console.log("error: ", err, "\n");
-    } else {
+    }
+    else {
       if (queryObj.op == "add") {
-        db.run('UPDATE Photobooth SET labels = ? WHERE fileName = ?', 
-               [data.labels + ";" + label, imageFile],
-               updateCallback);
+        var labelArr = data.labels.split(";");
+        for (var i = 0; i < labelArr.length; i++) {
+          if (labelArr[i] == label) {
+            response.status(500);
+            response.send("Repeated Label");
+            return;
+          }
+        }
+        db.run('UPDATE Photobooth SET labels = ? WHERE fileName = ?',
+                 [data.labels + ";" + label, imageFile],
+                 updateCallback);
       }
       else if (queryObj.op == 'remove') {
-        db.run('UPDATE Photobooth SET labels = ? WHERE fileName = ?', 
+        db.run('UPDATE Photobooth SET labels = ? WHERE fileName = ?',
                [data.labels.replace(';' + label, ''), imageFile],
                updateCallback);
+      }
+      else if (queryObj.op == 'get') {
+        response.status(200);
+        response.send(data);
       }
     }
   }

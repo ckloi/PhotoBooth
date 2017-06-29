@@ -1,4 +1,5 @@
-# ECS189H - Assignment 5 - Photobooth (Part One)
+
+# ECS189H - Assignment 6 Photobooth (Part Two)
 
 ### Group Members:
 - Man Yu Mandy Wong
@@ -14,6 +15,7 @@
   
 - In the public folder, we have all the html files, css files and js files, Empty assets folder to hold the upload images and the given photobooth folder:
    * assets
+   * googleCV.js
    * indipicture.html
    * photobooth
    * photobooth.css
@@ -22,3 +24,8 @@
    * photoboothMain.css
    * photoboothMain.html
    * photoboothMain.js
+---
+### Extra Credits:
+
+- We have attmepted the extra credits, both filter by favorite and the progress bar. 
+
